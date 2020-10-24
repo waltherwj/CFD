@@ -16,7 +16,7 @@ phi_1 = 1 # boundary value at 1
 n_nodes_exact = 100 # number of points used to plot the exact solution
 n_iter = 100 # maximum number of iterations on the entire mesh
 number_of_nodes = [3,5] # number of nodes the space will be discretized to
-error_threshold = 0.001 # error threshold to stop iterating
+error_threshold = 0.0001 # error threshold to stop iterating
 
 ###################
 #### FUNCTIONS ####
@@ -93,9 +93,13 @@ def phi_CD_and_FD(mesh_values, i, dx, k=1, a=1):
     ## get the function values around the node of interest
     phi = mesh_values[i-1:i+2]
     
+    ## initial values guess
+    initial = np.linspace(0,1, len(mesh_values))
+    phi_initial = initial[i-1:i+2]
+    
     ## if a node is NaN, replace it with 0. Better strategies could be devised
     ## for this step, but this naive approach is enough in this case
-    phi[np.isnan(phi)]=0
+    phi[np.isnan(phi)]=phi_initial[np.isnan(phi)]
     
     ## calculate the values of each of the terms that affect the current index,
     ## and then add them up
@@ -171,7 +175,7 @@ for velocity in a: #[1,10]
     for n_nodes in number_of_nodes: #[3,5]
         
         ##iterate each of the schemes
-        for scheme in [phi_CD_only, phi_CD_and_FD]:
+        for scheme in [phi_CD_only, phi_CD_and_BD]:
             
             ## create the mesh to iterate through and store the indices of the
             ## boundary conditions
@@ -183,11 +187,12 @@ for velocity in a: #[1,10]
             ## start an array to store the delta between each solution
             error_array = [np.inf, np.inf]
             
+            
             ## apply the scheme iteratively until the change between the
             ## previous and the next itireation is below the threshold, or 
             ## until we get to the maximum allowed number of iterations,
             ## when the program prints it failed to converge on a solution.
-            while np.abs(error_array[-1]-error_array[-2])>=error_threshold or len(error_array)<5:
+            while error_array[-1]>=error_threshold or len(error_array)<5:
                 
                 ## store previous iteration of the mesh to calculate error
                 prev_mesh_iter = mesh[1].copy()
@@ -198,11 +203,11 @@ for velocity in a: #[1,10]
                 ## appends the average numberical change between 
                 ## the last two iterations
                 
-                error_array.append((mesh[1]-prev_mesh_iter).mean())
+                error_array.append(np.abs((mesh[1]-prev_mesh_iter)).mean())
                 
                 ## if exceeding the max number of iterations, end iterations
                 if len(error_array)>=n_iter:
-                    print("failed to converge")
+                    print(f"v={velocity}, n_nodes={{n_nodes}}, scheme {scheme.__name__} failed to converge")
                     break
             
             ## create data for plotting exact solution
@@ -219,9 +224,12 @@ for velocity in a: #[1,10]
             ## add a title
             plt.title(f"velocity = {velocity} ,  number of nodes = {n_nodes}"
                       f"\n with function {scheme.__name__}"
-                      f"\n n_iter = {len(error_array)-2} for delta in solution = {error_array[-1]}")
+                      f"\n n_iter = {len(error_array)-2} for delta in solution = {error_array[-1]:.3e}")
+            
             plt.ylabel('phi')
+            plt.tight_layout()
             plt.xlabel('x coordinate')
+            plt.savefig(f"{scheme.__name__} velocity = {velocity}  n_nodes = {n_nodes}")
             
             ## force multiple graphs to be created
             plt.pause(0.001)
